@@ -18,6 +18,7 @@
 	},
 	"homepage": "https://github.com/riderjensen/rest-api-simple#readme",
 	"dependencies": {
+		"body-parser": "^1.18.3",
 		"express": "^4.16.4"
 	},
 	"devDependencies": {
