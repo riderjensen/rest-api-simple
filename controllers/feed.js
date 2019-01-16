@@ -4,6 +4,7 @@ const path = require('path');
 const { validationResult } = require('express-validator/check');
 
 const Post = require('../models/post');
+const User = require('../models/user');
 
 exports.getPosts = (req, res, next) => {
 	const currentPage = req.query.page || 1;
@@ -43,19 +44,27 @@ exports.createPost = (req, res, next) => {
 	const title = req.body.title;
 	const content = req.body.content;
 	const imageUrl = req.file.path.replace("\\", "/");
+	let creator;
+
 	// create post in db
 	const post = Post({
 		title: title,
 		content: content,
 		imageUrl: imageUrl,
-		creator: { name: 'Rider' },
+		creator: req.userId,
 	});
 	post.save()
 		.then(result => {
-			console.log(result);
+			return User.findById(req.userId);
+		}).then(user => {
+			user.posts.push(post);
+			return user.save();
+		})
+		.then(result => {
 			res.status(201).json({
 				message: 'Post created',
-				post: result
+				post: post,
+				creator: { _id: creator._id, name: creator.name }
 			})
 		})
 		.catch(err => {
@@ -89,7 +98,6 @@ exports.getPost = (req, res, next) => {
 exports.updatePost = (req, res, next) => {
 	const postId = req.params.postId;
 	const errors = validationResult(req);
-	console.log(postId);
 	if (!errors.isEmpty()) {
 		const error = new Error('Validation failed. Try again with better data.');
 		error.statusCode = 422;
@@ -111,6 +119,11 @@ exports.updatePost = (req, res, next) => {
 			if (!post) {
 				const error = new Error('Could not find post');
 				error.statusCode = 404;
+				throw error;
+			}
+			if (post.creator.toString() !== req.userId) {
+				const error = new Error('Not authorized');
+				error.statusCode = 403;
 				throw error;
 			}
 			if (imageUrl !== post.imageUrl) {
@@ -135,12 +148,16 @@ exports.updatePost = (req, res, next) => {
 
 exports.deletePost = (req, res, next) => {
 	const postId = req.params.postId;
-	console.log('here')
 	Post.findById(postId)
 		.then(post => {
 			if (!post) {
 				const error = new Error('Could not find post');
 				error.statusCode = 404;
+				throw error;
+			}
+			if (post.creator.toString() !== req.userId) {
+				const error = new Error('Not authorized');
+				error.statusCode = 403;
 				throw error;
 			}
 			//check logged in user
